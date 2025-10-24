@@ -1,15 +1,32 @@
 {
   "name": "create-arsi-app",
   "version": "1.0.0",
-  "description": "A flexible React starter template CLI with support for multiple routing, UI, and state management options",
-  "main": "index.js",
+  "description": "A flexible React starter template CLI for creating modern React applications with pre-configured setups including React Router, shadcn/ui, GraphQL, and more",
+  "main": "bin/cli.js",
   "type": "module",
   "bin": {
     "create-arsi-app": "./bin/cli.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepublishOnly": "echo 'Ready to publish'"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ringuralte/arsi-frontend-starter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ringuralte/arsi-frontend-starter/issues"
+  },
+  "homepage": "https://github.com/ringuralte/arsi-frontend-starter#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "bin",
+    "templates",
+    "README.md"
+  ],
   "keywords": [
     "react",
     "starter",

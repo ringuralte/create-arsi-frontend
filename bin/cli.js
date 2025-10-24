@@ -37,54 +37,42 @@ program
       projectName = name;
     }
 
-    // Prompt for choices
+    // Get available templates
+    const templatesDir = path.resolve(__dirname, '../templates');
+    const availableTemplates = await getAvailableTemplates(templatesDir);
+
+    if (availableTemplates.length === 0) {
+      console.log(chalk.red('\n❌ No templates found in the templates directory.'));
+      process.exit(1);
+    }
+
+    // Prompt for template selection and other options
     const answers = await inquirer.prompt([
       {
         type: 'list',
-        name: 'routing',
-        message: 'Which routing library would you like to use?',
-        choices: [
-          { name: 'React Router (with fs-routes)', value: 'react-router-fs' },
-          { name: 'TanStack Router', value: 'tanstack-router' },
-          { name: 'None', value: 'none' },
-        ],
-      },
-      {
-        type: 'list',
-        name: 'ui',
-        message: 'Which UI framework would you like to use?',
-        choices: [
-          { name: 'Tailwind CSS', value: 'tailwind' },
-          { name: 'Tailwind CSS + shadcn/ui', value: 'tailwind-shadcn' },
-          { name: 'Mantine', value: 'mantine' },
-        ],
-      },
-      {
-        type: 'list',
-        name: 'state',
-        message: 'Which state management library would you like to use?',
-        choices: [
-          { name: 'Zustand', value: 'zustand' },
-          { name: 'Redux Toolkit', value: 'redux' },
-          { name: 'None', value: 'none' },
-        ],
+        name: 'template',
+        message: 'Which template would you like to use?',
+        choices: availableTemplates.map(t => ({
+          name: formatTemplateName(t),
+          value: t,
+        })),
       },
       {
         type: 'confirm',
         name: 'typescript',
-        message: 'Would you like to use TypeScript?',
+        message: 'Use TypeScript?',
         default: true,
       },
       {
         type: 'confirm',
         name: 'eslint',
-        message: 'Would you like to include ESLint?',
+        message: 'Include ESLint?',
         default: true,
       },
       {
         type: 'confirm',
         name: 'husky',
-        message: 'Would you like to include Husky for git hooks?',
+        message: 'Include Husky for git hooks?',
         default: true,
       },
       {
@@ -128,60 +116,61 @@ program
       // Create target directory
       fs.ensureDirSync(targetDir);
 
-      // Copy base template (always included)
-      const templatesDir = path.resolve(__dirname, '../templates');
+      // Copy base template first (if it exists)
       const baseDir = path.join(templatesDir, 'base');
-
       if (fs.existsSync(baseDir)) {
-        await copyTemplate(baseDir, targetDir);
+        await copyTemplate(baseDir, targetDir, answers);
+        spinner.text = 'Base template copied...';
       }
 
-      // Copy routing template
-      if (answers.routing !== 'none') {
-        const routingDir = path.join(templatesDir, 'routing', answers.routing);
-        if (fs.existsSync(routingDir)) {
-          await mergeTemplate(routingDir, targetDir);
-        }
-      }
-
-      // Copy UI template
-      const uiDir = path.join(templatesDir, 'ui', answers.ui);
-      if (fs.existsSync(uiDir)) {
-        await mergeTemplate(uiDir, targetDir);
-      }
-
-      // Copy state management template
-      if (answers.state !== 'none') {
-        const stateDir = path.join(templatesDir, 'state', answers.state);
-        if (fs.existsSync(stateDir)) {
-          await mergeTemplate(stateDir, targetDir);
-        }
+      // Copy selected template
+      const templateDir = path.join(templatesDir, answers.template);
+      if (fs.existsSync(templateDir)) {
+        await copyTemplate(templateDir, targetDir, answers, true);
+        spinner.text = 'Template files copied...';
       }
 
       // Merge package.json files
-      await mergePackageJsons(targetDir, answers);
+      await mergePackageJsons(targetDir, templatesDir, answers);
 
-      // Update project name in package.json
+      // Update project name and package manager in package.json
       const pkgJsonPath = path.join(targetDir, 'package.json');
       if (fs.existsSync(pkgJsonPath)) {
         const pkgJson = await fs.readJson(pkgJsonPath);
         pkgJson.name = projectName;
-        pkgJson.version = '0.0.1';
-        pkgJson.packageManager = `${answers.packageManager}@${await getPackageManagerVersion(answers.packageManager)}`;
+        pkgJson.version = '0.1.0';
+
+        const pmVersion = await getPackageManagerVersion(answers.packageManager);
+        pkgJson.packageManager = `${answers.packageManager}@${pmVersion}`;
+
         await fs.writeJson(pkgJsonPath, pkgJson, { spaces: 2 });
       }
 
-      // Create .gitignore if it doesn't exist
-      const gitignorePath = path.join(targetDir, '.gitignore');
-      if (!fs.existsSync(gitignorePath)) {
-        await fs.writeFile(gitignorePath, `node_modules
-          dist
-          build
-          .env
-          .env.local
-          *.log
-          .DS_Store
-          `);
+      // Remove TypeScript files if TypeScript is not selected
+      if (!answers.typescript) {
+        await removeTypeScriptFiles(targetDir);
+        await convertToJavaScript(targetDir);
+      }
+
+      // Remove ESLint files if not selected
+      if (!answers.eslint) {
+        await removeESLintFiles(targetDir);
+      }
+
+      // Remove Husky files if not selected
+      if (!answers.husky) {
+        await removeHuskyFiles(targetDir);
+      }
+
+      // Create/update .gitignore
+      await createGitignore(targetDir);
+
+      // Initialize git repository
+      try {
+        await execa('git', ['init'], { cwd: targetDir });
+        spinner.text = 'Git repository initialized...';
+      } catch (error) {
+        // Git init is optional, don't fail if it doesn't work
       }
 
       spinner.succeed(chalk.green('Project created successfully!'));
@@ -190,7 +179,8 @@ program
       const installSpinner = ora('Installing dependencies...').start();
 
       try {
-        await execa(answers.packageManager, ['install'], {
+        const installArgs = answers.packageManager === 'yarn' ? [] : ['install'];
+        await execa(answers.packageManager, installArgs, {
           cwd: targetDir,
           stdio: 'pipe',
         });
@@ -202,14 +192,35 @@ program
         console.log(chalk.cyan(`  ${answers.packageManager} install`));
       }
 
+      // Setup Husky if selected and installed
+      if (answers.husky) {
+        const huskySpinner = ora('Setting up Husky...').start();
+        try {
+          const prepareArgs = answers.packageManager === 'npm' ? ['run', 'prepare'] : ['prepare'];
+          await execa(answers.packageManager, prepareArgs, {
+            cwd: targetDir,
+            stdio: 'pipe',
+          });
+          huskySpinner.succeed(chalk.green('Husky configured!'));
+        } catch (error) {
+          huskySpinner.warn(chalk.yellow('Husky setup skipped'));
+        }
+      }
+
       // Success message
       console.log(chalk.green.bold('\n✨ All done!\n'));
-      console.log(chalk.cyan('To get started:'));
+      console.log(chalk.cyan('Your project is ready. To get started:\n'));
       console.log(chalk.white(`  cd ${projectName}`));
-      console.log(chalk.white(`  ${answers.packageManager} ${answers.packageManager === 'npm' ? 'run ' : ''}dev\n`));
+
+      const devCommand = answers.packageManager === 'npm' ? 'npm run dev' : `${answers.packageManager} dev`;
+      console.log(chalk.white(`  ${devCommand}\n`));
+
+      // Show template-specific instructions if any
+      showTemplateInstructions(answers.template);
 
     } catch (error) {
       spinner.fail(chalk.red('Failed to create project'));
+      console.error(chalk.red('\nError details:'));
       console.error(error);
       process.exit(1);
     }
@@ -219,56 +230,76 @@ program.parse();
 
 // Helper functions
 
-async function copyTemplate(source, destination) {
+async function getAvailableTemplates(templatesDir) {
+  if (!fs.existsSync(templatesDir)) {
+    return [];
+  }
+
+  const entries = await fs.readdir(templatesDir, { withFileTypes: true });
+  return entries
+    .filter(entry => entry.isDirectory() && entry.name !== 'base')
+    .map(entry => entry.name);
+}
+
+function formatTemplateName(templateName) {
+  // Convert kebab-case to Title Case with proper formatting
+  return templateName
+    .split('-')
+    .map(word => {
+      // Keep acronyms uppercase
+      if (word === 'ssr') return 'SSR';
+      if (word === 'fs') return 'FS';
+      if (word === 'ui') return 'UI';
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+}
+
+async function copyTemplate(source, destination, answers, overwrite = false) {
   await fs.copy(source, destination, {
+    overwrite,
     filter: (src) => {
-      // Skip node_modules and lock files
       const basename = path.basename(src);
-      return !basename.includes('node_modules') &&
-             !basename.includes('pnpm-lock.yaml') &&
-             !basename.includes('package-lock.json') &&
-             !basename.includes('yarn.lock');
+
+      // Always skip node_modules and lock files
+      if (basename === 'node_modules') return false;
+      if (basename === 'pnpm-lock.yaml') return false;
+      if (basename === 'package-lock.json') return false;
+      if (basename === 'yarn.lock') return false;
+
+      // Skip package.json (handled separately)
+      if (basename === 'package.json') return false;
+
+      // Skip TypeScript config if TypeScript not selected
+      if (!answers.typescript) {
+        if (basename === 'tsconfig.json') return false;
+        if (basename.endsWith('.d.ts')) return false;
+      }
+
+      // Skip ESLint config if not selected
+      if (!answers.eslint) {
+        if (basename === 'eslint.config.js') return false;
+        if (basename === '.eslintrc.json') return false;
+        if (basename === '.eslintrc.js') return false;
+        if (basename === '.eslintignore') return false;
+      }
+
+      // Skip Husky and related files if not selected
+      if (!answers.husky) {
+        if (basename === '.husky') return false;
+        if (basename === 'commitlint.config.js') return false;
+      }
+
+      return true;
     },
   });
 }
 
-async function mergeTemplate(source, destination) {
-  const files = await fs.readdir(source, { withFileTypes: true });
-
-  for (const file of files) {
-    const sourcePath = path.join(source, file.name);
-    const destPath = path.join(destination, file.name);
-
-    // Skip node_modules and lock files
-    if (file.name === 'node_modules' ||
-        file.name === 'pnpm-lock.yaml' ||
-        file.name === 'package-lock.json' ||
-        file.name === 'yarn.lock') {
-      continue;
-    }
-
-    // Skip package.json (handled separately)
-    if (file.name === 'package.json') {
-      continue;
-    }
-
-    if (file.isDirectory()) {
-      await fs.ensureDir(destPath);
-      await mergeTemplate(sourcePath, destPath);
-    } else {
-      // Copy file, overwriting if it exists
-      await fs.copy(sourcePath, destPath, { overwrite: true });
-    }
-  }
-}
-
-async function mergePackageJsons(targetDir, answers) {
-  const pkgJsonPath = path.join(targetDir, 'package.json');
-  const templatesDir = path.resolve(__dirname, '../templates');
-
+async function mergePackageJsons(targetDir, templatesDir, answers) {
   let mergedPkg = {
     name: 'project',
-    version: '0.0.1',
+    version: '0.1.0',
+    type: 'module',
     scripts: {},
     dependencies: {},
     devDependencies: {},
@@ -281,42 +312,250 @@ async function mergePackageJsons(targetDir, answers) {
     mergedPkg = mergePkg(mergedPkg, basePkg);
   }
 
-  // Merge routing package.json
-  if (answers.routing !== 'none') {
-    const routingPkgPath = path.join(templatesDir, 'routing', answers.routing, 'package.json');
-    if (fs.existsSync(routingPkgPath)) {
-      const routingPkg = await fs.readJson(routingPkgPath);
-      mergedPkg = mergePkg(mergedPkg, routingPkg);
+  // Merge template package.json
+  const templatePkgPath = path.join(templatesDir, answers.template, 'package.json');
+  if (fs.existsSync(templatePkgPath)) {
+    const templatePkg = await fs.readJson(templatePkgPath);
+    mergedPkg = mergePkg(mergedPkg, templatePkg);
+  }
+
+  // Remove ESLint dependencies if not selected
+  if (!answers.eslint && mergedPkg.devDependencies) {
+    Object.keys(mergedPkg.devDependencies).forEach(dep => {
+      if (dep.includes('eslint')) {
+        delete mergedPkg.devDependencies[dep];
+      }
+    });
+
+    // Remove lint scripts
+    if (mergedPkg.scripts) {
+      delete mergedPkg.scripts.lint;
+      delete mergedPkg.scripts['lint:fix'];
+      delete mergedPkg.scripts.format;
+    }
+
+    // Remove lint-staged config
+    delete mergedPkg['lint-staged'];
+  }
+
+  // Remove Husky dependencies if not selected
+  if (!answers.husky && mergedPkg.devDependencies) {
+    delete mergedPkg.devDependencies.husky;
+    delete mergedPkg.devDependencies['lint-staged'];
+    delete mergedPkg.devDependencies['@commitlint/cli'];
+    delete mergedPkg.devDependencies['@commitlint/config-conventional'];
+
+    // Remove husky scripts
+    if (mergedPkg.scripts) {
+      delete mergedPkg.scripts.prepare;
+    }
+
+    // Remove lint-staged config
+    delete mergedPkg['lint-staged'];
+  }
+
+  // Remove TypeScript dependencies if not selected
+  if (!answers.typescript && mergedPkg.devDependencies) {
+    Object.keys(mergedPkg.devDependencies).forEach(dep => {
+      if (dep.includes('typescript') || dep.includes('@types/')) {
+        delete mergedPkg.devDependencies[dep];
+      }
+    });
+
+    // Remove typecheck script
+    if (mergedPkg.scripts) {
+      delete mergedPkg.scripts.typecheck;
     }
   }
 
-  // Merge UI package.json
-  const uiPkgPath = path.join(templatesDir, 'ui', answers.ui, 'package.json');
-  if (fs.existsSync(uiPkgPath)) {
-    const uiPkg = await fs.readJson(uiPkgPath);
-    mergedPkg = mergePkg(mergedPkg, uiPkg);
-  }
-
-  // Merge state package.json
-  if (answers.state !== 'none') {
-    const statePkgPath = path.join(templatesDir, 'state', answers.state, 'package.json');
-    if (fs.existsSync(statePkgPath)) {
-      const statePkg = await fs.readJson(statePkgPath);
-      mergedPkg = mergePkg(mergedPkg, statePkg);
-    }
-  }
-
-  await fs.writeJson(pkgJsonPath, mergedPkg, { spaces: 2 });
+  await fs.writeJson(path.join(targetDir, 'package.json'), mergedPkg, { spaces: 2 });
 }
 
 function mergePkg(target, source) {
-  return {
-    ...target,
-    ...source,
-    scripts: { ...target.scripts, ...source.scripts },
-    dependencies: { ...target.dependencies, ...source.dependencies },
-    devDependencies: { ...target.devDependencies, ...source.devDependencies },
-  };
+  const result = { ...target };
+
+  // Merge top-level properties
+  Object.keys(source).forEach(key => {
+    if (key === 'scripts' || key === 'dependencies' || key === 'devDependencies') {
+      result[key] = { ...target[key], ...source[key] };
+    } else if (key !== 'name' && key !== 'version') {
+      result[key] = source[key];
+    }
+  });
+
+  return result;
+}
+
+async function removeTypeScriptFiles(targetDir) {
+  const files = await getAllFiles(targetDir);
+
+  for (const file of files) {
+    if (file.endsWith('.ts') || file.endsWith('.tsx')) {
+      // We'll convert these, not remove them
+      continue;
+    }
+    if (file.endsWith('.d.ts') || path.basename(file) === 'tsconfig.json') {
+      await fs.remove(file);
+    }
+  }
+}
+
+async function convertToJavaScript(targetDir) {
+  const files = await getAllFiles(targetDir);
+
+  for (const file of files) {
+    if (file.endsWith('.ts') || file.endsWith('.tsx')) {
+      let content = await fs.readFile(file, 'utf-8');
+
+      // Basic TypeScript to JavaScript conversion
+      // Remove type annotations and interfaces
+      content = content.replace(/:\s*\w+(\[\])?(\s*=|\s*\)|\s*,|\s*;|\s*\|)/g, '$1');
+      content = content.replace(/interface\s+\w+\s*{[^}]*}/g, '');
+      content = content.replace(/type\s+\w+\s*=\s*[^;]+;/g, '');
+      content = content.replace(/<[^>]+>/g, ''); // Remove generic types
+      content = content.replace(/as\s+\w+/g, '');
+      content = content.replace(/import\s+type\s+/g, 'import ');
+
+      // Determine new extension
+      const newFile = file.endsWith('.tsx')
+        ? file.replace(/\.tsx$/, '.jsx')
+        : file.replace(/\.ts$/, '.js');
+
+      await fs.writeFile(newFile, content);
+
+      if (newFile !== file) {
+        await fs.remove(file);
+      }
+    }
+  }
+}
+
+async function removeESLintFiles(targetDir) {
+  const filesToRemove = [
+    'eslint.config.js',
+    '.eslintrc.json',
+    '.eslintrc.js',
+    '.eslintignore',
+  ];
+
+  for (const file of filesToRemove) {
+    const filePath = path.join(targetDir, file);
+    if (fs.existsSync(filePath)) {
+      await fs.remove(filePath);
+    }
+  }
+}
+
+async function removeHuskyFiles(targetDir) {
+  const huskyDir = path.join(targetDir, '.husky');
+  const commitlintConfig = path.join(targetDir, 'commitlint.config.js');
+
+  if (fs.existsSync(huskyDir)) {
+    await fs.remove(huskyDir);
+  }
+
+  if (fs.existsSync(commitlintConfig)) {
+    await fs.remove(commitlintConfig);
+  }
+}
+
+async function getAllFiles(dir) {
+  const files = [];
+
+  async function walk(directory) {
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(directory, entry.name);
+
+      if (entry.isDirectory()) {
+        // Skip node_modules and hidden directories (except .husky)
+        if (entry.name === 'node_modules' || (entry.name.startsWith('.') && entry.name !== '.husky')) {
+          continue;
+        }
+        await walk(fullPath);
+      } else {
+        files.push(fullPath);
+      }
+    }
+  }
+
+  await walk(dir);
+  return files;
+}
+
+async function createGitignore(targetDir) {
+  const gitignorePath = path.join(targetDir, '.gitignore');
+
+  const gitignoreContent = `# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+
+# Production builds
+dist/
+build/
+.output/
+.vercel/
+.netlify/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.history/
+
+# OS files
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# React Router specific
+.react-router/
+
+# TanStack specific
+.tanstack/
+
+# Vite
+.vite/
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# TypeScript
+*.tsbuildinfo
+`;
+
+  await fs.writeFile(gitignorePath, gitignoreContent);
 }
 
 async function getPackageManagerVersion(packageManager) {
@@ -331,5 +570,15 @@ async function getPackageManagerVersion(packageManager) {
       yarn: '4.0.0',
     };
     return defaults[packageManager] || '1.0.0';
+  }
+}
+
+function showTemplateInstructions(templateName) {
+  if (templateName === 'ssr-fs-shadcn-graphql') {
+    console.log(chalk.blue('📝 Template-specific notes:'));
+    console.log(chalk.white('  • This template uses React Router with SSR'));
+    console.log(chalk.white('  • shadcn/ui components are pre-configured'));
+    console.log(chalk.white('  • GraphQL client is set up with TanStack Query'));
+    console.log(chalk.white('  • Update the GraphQL schema in codegen.ts\n'));
   }
 }
