@@ -1,13 +1,42 @@
 {
-  "name": "arsi-frontend-starter",
+  "name": "create-arsi-app",
   "version": "1.0.0",
-  "description": "",
+  "description": "A flexible React starter template CLI with support for multiple routing, UI, and state management options",
   "main": "index.js",
+  "type": "module",
+  "bin": {
+    "create-arsi-app": "./bin/cli.js"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "react",
+    "starter",
+    "template",
+    "cli",
+    "vite",
+    "typescript",
+    "react-router",
+    "tanstack",
+    "tailwind",
+    "mantine",
+    "zustand",
+    "redux"
+  ],
+  "author": "ringuralte",
   "license": "ISC",
-  "packageManager": "pnpm@10.11.1"
+  "packageManager": "pnpm@10.11.1",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "inquirer": "^12.2.0",
+    "ora": "^8.1.1",
+    "fs-extra": "^11.2.0",
+    "execa": "^9.5.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.1",
+    "@types/fs-extra": "^11.0.4"
+  }
 }

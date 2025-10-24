@@ -1,1 +1,1 @@
-A starter template for creating react frontends.
+A starter template for creating react frontends. This will be run similar to using tools like npx create-react-app where it will have a cli that will prompt the user for the project requirements like what routing library it will use, whether using react-hook-form or tanstack-form etc.
