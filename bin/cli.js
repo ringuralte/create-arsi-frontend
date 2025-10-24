@@ -18,7 +18,7 @@ program
   .version('1.0.0')
   .argument('[project-name]', 'Name of your project')
   .action(async (projectName) => {
-    console.log(chalk.blue.bold('\n🚀 Welcome to Create ARSI App!\n'));
+    console.log(chalk.blue.bold('\n🚀 Welcome to Create Arsi Frontend!\n'));
 
     // Prompt for project name if not provided
     if (!projectName) {
@@ -87,6 +87,13 @@ program
         default: 'pnpm',
       },
     ]);
+
+    // Prompt for environment variables if template needs them
+    let envVars = {};
+    if (needsEnvConfiguration(answers.template)) {
+      console.log(chalk.cyan('\n⚙️  Environment Configuration\n'));
+      envVars = await promptForEnvVars(answers.template);
+    }
 
     const targetDir = path.resolve(process.cwd(), projectName);
 
@@ -164,6 +171,12 @@ program
 
       // Create/update .gitignore
       await createGitignore(targetDir);
+
+      // Create .env.development file with user-provided values
+      if (envVars && Object.keys(envVars).length > 0) {
+        await createEnvFile(targetDir, envVars);
+        spinner.text = 'Environment file created...';
+      }
 
       // Initialize git repository
       try {
@@ -269,6 +282,11 @@ async function copyTemplate(source, destination, answers, overwrite = false) {
 
       // Skip package.json (handled separately)
       if (basename === 'package.json') return false;
+
+      // Skip .env files (handled separately)
+      if (basename === '.env.development') return false;
+      if (basename === '.env.example') return false;
+      if (basename === '.env') return false;
 
       // Skip TypeScript config if TypeScript not selected
       if (!answers.typescript) {
@@ -579,6 +597,139 @@ function showTemplateInstructions(templateName) {
     console.log(chalk.white('  • This template uses React Router with SSR'));
     console.log(chalk.white('  • shadcn/ui components are pre-configured'));
     console.log(chalk.white('  • GraphQL client is set up with TanStack Query'));
-    console.log(chalk.white('  • Update the GraphQL schema in codegen.ts\n'));
+    console.log(chalk.white('  • Update the GraphQL schema in codegen.ts'));
+    console.log(chalk.white('  • Environment variables are configured in .env.development\n'));
   }
+}
+
+function needsEnvConfiguration(templateName) {
+  // Add template names that require environment configuration
+  const templatesWithEnv = ['ssr-fs-shadcn-graphql'];
+  return templatesWithEnv.includes(templateName);
+}
+
+async function promptForEnvVars(templateName) {
+  if (templateName === 'ssr-fs-shadcn-graphql') {
+    const envAnswers = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'baseUrl',
+        message: 'Backend API base URL: (http://localhost:8002)',
+        default: 'http://localhost:8002',
+        validate: (input) => {
+          if (!input.trim()) return 'Base URL is required';
+          try {
+            new URL(input);
+            return true;
+          } catch {
+            return 'Please enter a valid URL';
+          }
+        },
+      },
+      {
+        type: 'input',
+        name: 'graphqlUrl',
+        message: 'GraphQL endpoint URL: (http://localhost:8002/arsi)',
+        default: (answers) => `${answers.baseUrl}/arsi`,
+        validate: (input) => {
+          if (!input.trim()) return 'GraphQL URL is required';
+          try {
+            new URL(input);
+            return true;
+          } catch {
+            return 'Please enter a valid URL';
+          }
+        },
+      },
+      {
+        type: 'input',
+        name: 'sessionCookieName',
+        message: 'Session cookie name:',
+        default: 'arsi-project',
+        validate: (input) => {
+          if (!input.trim()) return 'Cookie name is required';
+          if (!/^[a-z0-9-_]+$/i.test(input)) {
+            return 'Cookie name can only contain letters, numbers, hyphens, and underscores';
+          }
+          return true;
+        },
+      },
+      {
+        type: 'password',
+        name: 'sessionSecret',
+        message: 'Session secret (leave empty to generate random):',
+        default: '',
+        mask: '*',
+      },
+      {
+        type: 'input',
+        name: 'rzpayKey',
+        message: 'Razorpay key (optional):',
+        default: '',
+      },
+    ]);
+
+    // Generate random session secret if not provided
+    if (!envAnswers.sessionSecret) {
+      envAnswers.sessionSecret = generateRandomSecret(32);
+    }
+
+    return {
+      VITE_BASE_URL: envAnswers.baseUrl,
+      VITE_BASE_GRAPHQL_URL: envAnswers.graphqlUrl,
+      VITE_SESSION_COOKIE_NAME: envAnswers.sessionCookieName,
+      VITE_SESSION_SECRET: envAnswers.sessionSecret,
+      VITE_RZPAY_KEY: envAnswers.rzpayKey,
+    };
+  }
+
+  return {};
+}
+
+async function createEnvFile(targetDir, envVars) {
+  const envDevPath = path.join(targetDir, '.env.development');
+  const envExamplePath = path.join(targetDir, '.env.example');
+
+  let envContent = '# Environment Configuration\n';
+  envContent += '# Generated by create-arsi-app\n\n';
+
+  for (const [key, value] of Object.entries(envVars)) {
+    envContent += `${key}=${value}\n`;
+  }
+
+  // Create .env.development with actual values
+  await fs.writeFile(envDevPath, envContent);
+
+  // Create .env.example with placeholder values
+  let exampleContent = '# Environment Configuration\n';
+  exampleContent += '# Copy this file to .env.development and fill in your values\n\n';
+
+  for (const [key, value] of Object.entries(envVars)) {
+    // Use placeholder values for example file
+    let exampleValue = value;
+    if (key === 'VITE_SESSION_SECRET') {
+      exampleValue = 'your-secret-key-here';
+    } else if (key === 'VITE_RZPAY_KEY' && !value) {
+      exampleValue = '';
+    } else if (key.includes('URL')) {
+      // Keep URL examples as-is
+      exampleValue = value;
+    } else if (key === 'VITE_SESSION_COOKIE_NAME') {
+      exampleValue = value;
+    }
+
+    exampleContent += `${key}=${exampleValue}\n`;
+  }
+
+  // Create .env.example
+  await fs.writeFile(envExamplePath, exampleContent);
+}
+
+function generateRandomSecret(length = 32) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  let secret = '';
+  for (let i = 0; i < length; i++) {
+    secret += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return secret;
 }
