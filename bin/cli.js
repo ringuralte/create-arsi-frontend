@@ -180,7 +180,7 @@ program
 
       // Initialize git repository
       try {
-        await execa('git', ['init'], { cwd: targetDir });
+        await execa('git', ['init', '-b', 'dev'], { cwd: targetDir });
         spinner.text = 'Git repository initialized...';
       } catch (error) {
         // Git init is optional, don't fail if it doesn't work
@@ -614,7 +614,7 @@ async function promptForEnvVars(templateName) {
       {
         type: 'input',
         name: 'baseUrl',
-        message: 'Backend API base URL: (http://localhost:8002)',
+        message: 'Backend API base URL:',
         default: 'http://localhost:8002',
         validate: (input) => {
           if (!input.trim()) return 'Base URL is required';
@@ -629,7 +629,7 @@ async function promptForEnvVars(templateName) {
       {
         type: 'input',
         name: 'graphqlUrl',
-        message: 'GraphQL endpoint URL: (http://localhost:8002/arsi)',
+        message: 'GraphQL endpoint URL:',
         default: (answers) => `${answers.baseUrl}/arsi`,
         validate: (input) => {
           if (!input.trim()) return 'GraphQL URL is required';
