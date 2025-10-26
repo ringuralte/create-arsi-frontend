@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query'
 import { ClientError } from 'graphql-request'
 
+import { NuqsAdapter } from 'nuqs/adapters/react-router/v7'
 import { useState } from 'react'
 import {
   isRouteErrorResponse,
@@ -113,7 +114,9 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <NuqsAdapter>
+        <Outlet />
+      </NuqsAdapter>
     </QueryClientProvider>
   )
 }
