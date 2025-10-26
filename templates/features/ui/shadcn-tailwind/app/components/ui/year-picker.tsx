@@ -139,12 +139,12 @@ function YearPicker({
                             : (variant?.calendar?.main ?? 'ghost'),
                       }),
                       `
-                        hover:bg-vanglaini-red/90 hover:text-white
                         h-full w-full p-0 font-normal
+                        hover:bg-primary/90 hover:text-white
                         aria-selected:opacity-100
                       `,
                       {
-                        'bg-vanglaini-red': year === y,
+                        'bg-primary': year === y,
                       },
                     )}
                   >

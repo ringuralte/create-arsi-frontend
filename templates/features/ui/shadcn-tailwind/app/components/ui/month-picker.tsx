@@ -58,7 +58,7 @@ interface MonthCalProps {
 
 type ButtonVariant
   = | 'default'
-    | 'outline-solid'
+    | 'outline'
     | 'ghost'
     | 'link'
     | 'destructive'
@@ -165,18 +165,23 @@ function MonthCal({
   return (
     <>
       <div className="relative flex items-center justify-center pt-1">
-        <button onClick={onLabelClick} className="text-sm font-medium">
+        <button
+          type="button"
+          onClick={onLabelClick}
+          className="text-sm font-medium"
+        >
           {callbacks?.yearLabel ? callbacks?.yearLabel(menuYear) : menuYear}
         </button>
         <div className="flex items-center space-x-1">
           <button
+            type="button"
             onClick={() => {
               setMenuYear(menuYear - 1)
               if (onYearBackward)
                 onYearBackward()
             }}
             className={cn(
-              buttonVariants({ variant: variant?.chevrons ?? 'outline-solid' }),
+              buttonVariants({ variant: variant?.chevrons ?? 'outline' }),
               `
                 absolute left-1 inline-flex h-7 w-7 items-center justify-center
                 p-0
@@ -186,13 +191,14 @@ function MonthCal({
             <ChevronLeft className="size-4 opacity-50" />
           </button>
           <button
+            type="button"
             onClick={() => {
               setMenuYear(menuYear + 1)
               if (onYearForward)
                 onYearForward()
             }}
             className={cn(
-              buttonVariants({ variant: variant?.chevrons ?? 'outline-solid' }),
+              buttonVariants({ variant: variant?.chevrons ?? 'outline' }),
               `
                 absolute right-1 inline-flex h-7 w-7 items-center justify-center
                 p-0
@@ -223,6 +229,7 @@ function MonthCal({
                       `}
                     >
                       <button
+                        type="button"
                         onClick={() => {
                           setMonth(m.number)
                           setYear(menuYear)
@@ -232,35 +239,35 @@ function MonthCal({
                         disabled={
                           (maxDate
                             ? menuYear > maxDate?.getFullYear()
-                            || (menuYear == maxDate?.getFullYear()
+                            || (menuYear === maxDate?.getFullYear()
                               && m.number > maxDate.getMonth())
                             : false)
                           || (minDate
                             ? menuYear < minDate?.getFullYear()
-                            || (menuYear == minDate?.getFullYear()
+                            || (menuYear === minDate?.getFullYear()
                               && m.number < minDate.getMonth())
                             : false)
                           || (disabledDatesMapped
                             ? disabledDatesMapped?.some(
-                                d => d.year == menuYear && d.month == m.number,
+                                d => d.year === menuYear && d.month === m.number,
                               )
                             : false)
                         }
                         className={cn(
                           buttonVariants({
                             variant:
-                              month == m.number && menuYear == year
+                              month === m.number && menuYear === year
                                 ? (variant?.calendar?.selected ?? 'default')
                                 : (variant?.calendar?.main ?? 'ghost'),
                           }),
                           `
-                            hover:bg-vanglaini-red/90 hover:text-white
                             h-full w-full p-0 font-normal
+                            hover:bg-primary/90 hover:text-white
                             aria-selected:opacity-100
                           `,
                           {
-                            'bg-vanglaini-red':
-                              month == m.number && menuYear == year,
+                            'bg-primary':
+                              month === m.number && menuYear === year,
                           },
                         )}
                       >
