@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState } from "react"
 
 /**
  * Hook for managing a boolean state and its toggling.
@@ -12,10 +12,9 @@ export default function useBoolean() {
 
   const toggle = (open?: boolean) => {
     if (open) {
-      setIsOpen(open)
-    }
-    else {
-      setIsOpen(prev => !prev)
+      setIsOpen(open);
+    } else {
+      setIsOpen((prev) => !prev)
     }
   }
 
