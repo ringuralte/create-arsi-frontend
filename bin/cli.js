@@ -8,6 +8,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { execa } from 'execa';
+import { addTailwindToViteConfig } from './vite-config-modifier.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -236,6 +237,19 @@ async function createProject(projectName, options) {
     spinner.text = `Setting up ${ui} UI framework...`;
     const uiDir = path.join(templatesDir, 'features', 'ui', ui);
     await mergeDirectories(uiDir, targetDir, ['node_modules', 'pnpm-lock.yaml', 'package.json'], ['app.css']);
+
+    // Step 3.5: Modify vite.config.ts if using Tailwind-based UI
+    if (ui === 'tailwind' || ui === 'shadcn-tailwind') {
+      spinner.text = 'Configuring Tailwind CSS in Vite...';
+      const viteConfigPath = path.join(targetDir, 'vite.config.ts');
+
+      try {
+        await addTailwindToViteConfig(viteConfigPath);
+      } catch (error) {
+        spinner.warn(chalk.yellow(`Warning: ${error.message}`));
+        console.log(chalk.yellow('You may need to manually add Tailwind CSS to your vite.config.ts'));
+      }
+    }
 
     // Step 4: Create react-router.config.ts if using React Router framework
     if (renderMode) {
