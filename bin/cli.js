@@ -17,9 +17,35 @@ const program = new Command();
 // Template configurations
 const ROUTING_OPTIONS = [
   {
-    name: 'SSR with File-System Routes & GraphQL',
-    value: 'ssr-fs-graphql',
-    description: 'React Router with file-system routing and GraphQL support'
+    name: 'Basic SPA with react router, react query and GraphQL support',
+    value: 'basic-rr-rq-graphql',
+    description: 'Basic SPA app with React Router, react query and GraphQL support',
+    isReactRouterFramework: false
+  },
+  {
+    name: 'React Router, React Query & Graphql',
+    value: 'rr-graphql-rq',
+    description: 'React Router with react query and GraphQL support',
+    isReactRouterFramework: true
+  },
+  {
+    name: 'React Router with File-System Routes, React Query & GraphQL',
+    value: 'rr-fs-graphql-rq',
+    description: 'React Router with file-system routing, react query and GraphQL support',
+    isReactRouterFramework: true
+  },
+];
+
+const RENDER_MODE_OPTIONS = [
+  {
+    name: 'SSR (Server-Side Rendering)',
+    value: 'ssr',
+    description: 'Server-side rendering for better SEO and initial load performance'
+  },
+  {
+    name: 'SPA (Single Page Application)',
+    value: 'spa',
+    description: 'Client-side only rendering'
   }
 ];
 
@@ -146,6 +172,26 @@ async function createProject(projectName, options) {
     }
   ]);
 
+  // Check if selected routing is React Router framework mode
+  const selectedRoutingOption = ROUTING_OPTIONS.find(opt => opt.value === routing);
+  let renderMode = null;
+
+  // Prompt for render mode if using React Router framework
+  if (selectedRoutingOption?.isReactRouterFramework) {
+    const renderModeAnswer = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'renderMode',
+        message: 'Which rendering mode would you like to use?',
+        choices: RENDER_MODE_OPTIONS.map(opt => ({
+          name: `${opt.name} - ${chalk.gray(opt.description)}`,
+          value: opt.value
+        }))
+      }
+    ]);
+    renderMode = renderModeAnswer.renderMode;
+  }
+
   // Prompt for UI option
   const { ui } = await inquirer.prompt([
     {
@@ -191,7 +237,25 @@ async function createProject(projectName, options) {
     const uiDir = path.join(templatesDir, 'features', 'ui', ui);
     await mergeDirectories(uiDir, targetDir, ['node_modules', 'pnpm-lock.yaml', 'package.json'], ['app.css']);
 
-    // Step 4: Merge package.json files
+    // Step 4: Create react-router.config.ts if using React Router framework
+    if (renderMode) {
+      spinner.text = 'Creating React Router configuration...';
+      const reactRouterConfig = `import type { Config } from '@react-router/dev/config'
+
+export default {
+  // Config options...
+  // Server-side render by default, to enable SPA mode set this to \`false\`
+  ssr: ${renderMode === 'ssr'},
+} satisfies Config
+`;
+      await fs.writeFile(
+        path.join(targetDir, 'react-router.config.ts'),
+        reactRouterConfig,
+        'utf-8'
+      );
+    }
+
+    // Step 5: Merge package.json files
     spinner.text = 'Merging package configurations...';
     const basePackageJson = await fs.readJson(path.join(baseDir, 'package.json'));
     const routingPackageJson = await fs.readJson(path.join(routingDir, 'package.json'));
