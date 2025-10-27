@@ -19,7 +19,7 @@ const program = new Command();
 const ROUTING_OPTIONS = [
   {
     name: 'Basic SPA with react router, react query and GraphQL support',
-    value: 'basic-rr-rq-graphql',
+    value: 'basic-spa',
     description: 'Basic SPA app with React Router, react query and GraphQL support',
     isReactRouterFramework: false
   },
