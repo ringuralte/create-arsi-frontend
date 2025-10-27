@@ -1,17 +1,8 @@
-import type {
-  MonthChangeEventHandler,
-} from 'react-day-picker'
+import type { MonthChangeEventHandler } from 'react-day-picker'
 import { format } from 'date-fns'
-import {
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react'
-import { useQueryState } from 'nuqs'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import {
-  DayPicker,
-  getDefaultClassNames,
-} from 'react-day-picker'
+import { DayPicker, getDefaultClassNames } from 'react-day-picker'
 import { Button, buttonVariants } from '~/components/ui/button'
 import {
   Popover,
@@ -22,6 +13,8 @@ import { cn } from '~/lib/utils'
 import { MonthPicker } from './month-picker'
 
 interface Props {
+  date: string | null
+  setDate: (date: string | null) => void
   buttonClassName?: string
   className?: string
   variant?: 'link'
@@ -29,14 +22,17 @@ interface Props {
 }
 
 export default function AppCalendar({
+  date,
+  setDate,
   className,
   buttonClassName,
   variant,
   closeSheet,
 }: Props) {
   const [openCalendar, setOpenCalendar] = useState(false)
-  const [date, setDate] = useQueryState('date')
-  const [month, setMonth] = useState<Date>(() => new Date())
+  const [month, setMonth] = useState<Date>(() => {
+    return new Date()
+  })
   const [mode, setMode] = useState<'month' | 'date'>('date')
 
   const calendarDate = date ? new Date(date) : new Date()
@@ -69,7 +65,11 @@ export default function AppCalendar({
   }, [])
 
   return (
-    <Popover modal={true} open={openCalendar} onOpenChange={setOpenCalendar}>
+    <Popover
+      modal={true}
+      open={openCalendar}
+      onOpenChange={setOpenCalendar}
+    >
       <PopoverTrigger asChild>
         <Button
           variant={variant ? 'link' : 'outline'}
@@ -85,10 +85,11 @@ export default function AppCalendar({
           {calendarDate
             ? (
                 <>
-                  <span className={`
-                    hidden
-                    lg:block
-                  `}
+                  <span
+                    className={`
+                      hidden
+                      lg:block
+                    `}
                   >
                     {format(calendarDate, 'do MMMM yyyy')}
                   </span>
@@ -121,8 +122,7 @@ export default function AppCalendar({
                 onMonthChange={handleMonthChange}
                 className={cn('p-1', className)}
                 classNames={{
-                  months:
-                'flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0',
+                  months: 'flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0',
                   month: 'space-y-4 flex flex-col w-full',
                   caption_label: 'text-sm font-medium',
                   nav: cn(
@@ -160,7 +160,7 @@ export default function AppCalendar({
                   month_grid: 'w-full border-collapse space-y-1',
                   weekdays: 'flex',
                   weekday:
-                'text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]',
+                                'text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]',
                   week: 'flex w-full mt-2',
                   day: 'h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20',
                   day_button: cn(
@@ -172,13 +172,13 @@ export default function AppCalendar({
                   ),
                   range_end: 'day-range-end',
                   selected:
-                'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-md',
+                                'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-md',
                   today: 'bg-accent text-accent-foreground',
                   outside:
-                'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',
+                                'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',
                   disabled: 'text-muted-foreground opacity-50',
                   range_middle:
-                'aria-selected:bg-accent aria-selected:text-accent-foreground',
+                                'aria-selected:bg-accent aria-selected:text-accent-foreground',
                   hidden: 'invisible',
                 }}
                 components={{
@@ -199,7 +199,10 @@ export default function AppCalendar({
                         }}
                       >
                         <span className="text-sm font-medium">
-                          {format(calendarMonth.date, 'MMMM yyyy')}
+                          {format(
+                            calendarMonth.date,
+                            'MMMM yyyy',
+                          )}
                         </span>
                       </div>
                     )
