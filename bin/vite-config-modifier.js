@@ -37,18 +37,17 @@ export async function addTailwindToViteConfig(configPath) {
     }
 
     // Add tailwindcss() to the plugins array
-    // Find the plugins array and add tailwindcss() as the last item
+    // Find the plugins array and add tailwindcss() as the first item
     const pluginsRegex = /plugins:\s*\[([\s\S]*?)\]/;
     const pluginsMatch = content.match(pluginsRegex);
 
     if (pluginsMatch) {
       const pluginsContent = pluginsMatch[1];
-      const hasTrailingComma = pluginsContent.trim().endsWith(',');
 
       // Determine the indentation level
       const lines = pluginsContent.split('\n');
-      const lastNonEmptyLine = lines.filter(line => line.trim()).pop() || '';
-      const indentation = lastNonEmptyLine.match(/^\s*/)?.[0] || '    ';
+      const firstNonEmptyLine = lines.find(line => line.trim()) || '';
+      const indentation = firstNonEmptyLine.match(/^\s*/)?.[0] || '    ';
 
       // Build the new plugins content
       let newPluginsContent;
@@ -56,15 +55,16 @@ export async function addTailwindToViteConfig(configPath) {
         // Empty plugins array
         newPluginsContent = `\n${indentation}tailwindcss()\n  `;
       } else {
-        // Add tailwindcss() as the last plugin
-        const separator = hasTrailingComma ? '' : ',';
-        newPluginsContent = pluginsContent.trimEnd() + separator + `\n${indentation}tailwindcss()`;
+        // Add tailwindcss() as the first plugin
+        // Remove leading whitespace from pluginsContent and add it back with proper formatting
+        const trimmedPlugins = pluginsContent.trimStart();
+        newPluginsContent = `\n${indentation}tailwindcss(),\n${indentation}${trimmedPlugins}`;
       }
 
       // Replace the plugins array content
       content = content.replace(
         pluginsRegex,
-        `plugins: [${newPluginsContent}\n  ]`
+        `plugins: [${newPluginsContent}]`
       );
     }
 
