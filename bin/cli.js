@@ -18,12 +18,6 @@ const program = new Command();
 // Template configurations
 const ROUTING_OPTIONS = [
   {
-    name: 'Basic SPA with react router, react query and GraphQL support',
-    value: 'basic-spa',
-    description: 'Basic SPA app with React Router, react query and GraphQL support',
-    isReactRouterFramework: false
-  },
-  {
     name: 'React Router, React Query & Graphql',
     value: 'rr-graphql-rq',
     description: 'React Router with react query and GraphQL support',
@@ -34,6 +28,12 @@ const ROUTING_OPTIONS = [
     value: 'rr-fs-graphql-rq',
     description: 'React Router with file-system routing, react query and GraphQL support',
     isReactRouterFramework: true
+  },
+  {
+    name: 'Basic SPA with react router, react query and GraphQL support',
+    value: 'basic-spa',
+    description: 'Basic SPA app with React Router, react query and GraphQL support',
+    isReactRouterFramework: false
   },
 ];
 
@@ -52,15 +52,15 @@ const RENDER_MODE_OPTIONS = [
 
 const UI_OPTIONS = [
   {
+    name: 'Shadcn UI + Tailwind CSS',
+    value: 'shadcn-tailwind',
+    description: 'Shadcn UI components with Tailwind CSS'
+  },
+  {
     name: 'Tailwind CSS (Basic)',
     value: 'tailwind',
     description: 'Tailwind CSS with basic utilities'
   },
-  {
-    name: 'Shadcn UI + Tailwind CSS',
-    value: 'shadcn-tailwind',
-    description: 'Shadcn UI components with Tailwind CSS'
-  }
 ];
 
 // Helper function to merge package.json files
@@ -147,6 +147,43 @@ async function mergeDirectories(src, dest, exclude = ['node_modules', 'pnpm-lock
   }
 }
 
+// Helper function to initialize git repository
+async function initializeGit(targetDir, projectName) {
+  const gitSpinner = ora('Initializing git repository...').start();
+
+  try {
+    // Check if git is installed
+    try {
+      await execa('git', ['--version'], { cwd: targetDir });
+    } catch (error) {
+      gitSpinner.warn(chalk.yellow('Git is not installed. Skipping git initialization.'));
+      return;
+    }
+
+    // Initialize git repository
+    await execa('git', ['init'], { cwd: targetDir });
+
+    // Create and checkout dev branch
+    await execa('git', ['checkout', '-b', 'dev'], { cwd: targetDir });
+
+    // Stage all files
+    await execa('git', ['add', '.'], { cwd: targetDir });
+
+    // Create initial commit
+    await execa('git', ['commit', '-m', 'Initial commit: Project scaffolded'], { cwd: targetDir });
+
+    gitSpinner.succeed(chalk.green('Git repository initialized with "dev" branch!'));
+  } catch (error) {
+    gitSpinner.fail(chalk.red('Failed to initialize git repository'));
+    console.log(chalk.yellow('\nYou can initialize git manually by running:'));
+    console.log(chalk.cyan(`  cd ${projectName}`));
+    console.log(chalk.cyan('  git init'));
+    console.log(chalk.cyan('  git checkout -b dev'));
+    console.log(chalk.cyan('  git add .'));
+    console.log(chalk.cyan('  git commit -m "Initial commit"'));
+  }
+}
+
 // Main CLI function
 async function createProject(projectName, options) {
   const targetDir = path.resolve(process.cwd(), projectName);
@@ -216,6 +253,20 @@ async function createProject(projectName, options) {
       default: 'pnpm'
     }
   ]);
+
+  // Prompt for git initialization (unless --skip-git flag is used)
+  let initGit = !options.skipGit;
+  if (!options.skipGit) {
+    const gitAnswer = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'initGit',
+        message: 'Initialize a git repository with "dev" branch?',
+        default: true
+      }
+    ]);
+    initGit = gitAnswer.initGit;
+  }
 
   const spinner = ora('Creating your project...').start();
 
@@ -312,6 +363,11 @@ export default {
       }
     }
 
+    // Initialize git repository if requested
+    if (initGit) {
+      await initializeGit(targetDir, projectName);
+    }
+
     // Success message
     console.log(chalk.green('\n✨ All done! Your project is ready.\n'));
     console.log(chalk.cyan('To get started:\n'));
@@ -344,6 +400,7 @@ program
   .version('1.0.0')
   .argument('[project-name]', 'Name of the project')
   .option('--skip-install', 'Skip dependency installation')
+  .option('--skip-git', 'Skip git repository initialization')
   .action(async (projectName, options) => {
     let name = projectName;
 
