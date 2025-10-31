@@ -499,16 +499,6 @@ export default {
         await fs.writeFile(preCommitPath, preCommitContent, 'utf-8');
 
         huskySpinner.succeed(chalk.green('Husky initialized successfully!'));
-
-        // Commit Husky changes
-        const huskyCommitSpinner = ora('Committing Husky configuration...').start();
-        try {
-          await execa('git', ['add', '.husky'], { cwd: targetDir });
-          await execa('git', ['commit', '-m', 'chore: configure husky and lint-staged'], { cwd: targetDir });
-          huskyCommitSpinner.succeed(chalk.green('Husky configuration committed!'));
-        } catch (error) {
-          huskyCommitSpinner.warn(chalk.yellow('Failed to commit Husky changes'));
-        }
       } catch (error) {
         huskySpinner.warn(chalk.yellow('Husky initialization skipped or failed'));
         console.log(chalk.gray('You can initialize Husky manually by running:'));
