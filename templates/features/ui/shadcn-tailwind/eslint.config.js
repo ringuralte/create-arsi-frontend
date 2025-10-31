@@ -1,14 +1,17 @@
 import antfu from '@antfu/eslint-config'
 import betterTailwind from 'eslint-plugin-better-tailwindcss'
+import tanstackQuery from '@tanstack/eslint-plugin-query'
 
 export default antfu(
   {
     formatters: true,
     react: true,
   },
+  ...tanstackQuery.configs['flat/recommended'],
   {
     plugins: {
       'better-tailwindcss': betterTailwind,
+      '@tanstack/query': tanstackQuery,
     },
     rules: {
       ...betterTailwind.configs.recommended.rules,

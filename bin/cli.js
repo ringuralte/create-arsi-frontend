@@ -359,7 +359,15 @@ export default {
         // Initialize Husky
         const huskySpinner = ora('Initializing Husky...').start();
         try {
-          await execa(packageManager, ['run', 'prepare'], {
+          const huskyInitCmd = packageManager === 'pnpm'
+            ? ['exec', 'husky', 'init']
+            : packageManager === 'yarn'
+            ? ['dlx', 'husky', 'init']
+            : packageManager === 'bun'
+            ? ['x', 'husky', 'init']
+            : ['exec', '--', 'husky', 'init']; // npm default
+
+          await execa(packageManager === 'npm' ? 'npx' : packageManager, huskyInitCmd, {
             cwd: targetDir,
             stdio: 'pipe'
           });
@@ -368,7 +376,15 @@ export default {
           huskySpinner.warn(chalk.yellow('Husky initialization skipped or failed'));
           console.log(chalk.gray('You can initialize Husky manually by running:'));
           console.log(chalk.cyan(`  cd ${projectName}`));
-          console.log(chalk.cyan(`  ${packageManager} run prepare`));
+          if (packageManager === 'pnpm') {
+            console.log(chalk.cyan(`  pnpm exec husky init`));
+          } else if (packageManager === 'yarn') {
+            console.log(chalk.cyan(`  yarn dlx husky init`));
+          } else if (packageManager === 'bun') {
+            console.log(chalk.cyan(`  bunx husky init`));
+          } else {
+            console.log(chalk.cyan(`  npx husky init`));
+          }
         }
       } catch (error) {
         installSpinner.fail(chalk.red('Failed to install dependencies'));
