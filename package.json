@@ -1,6 +1,6 @@
 {
   "name": "create-arsi-frontend",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "A flexible React starter template CLI for creating modern React applications with pre-configured setups including React Router, shadcn/ui, GraphQL, and more",
   "main": "bin/cli.js",
   "type": "module",
