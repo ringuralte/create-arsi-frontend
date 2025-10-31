@@ -391,9 +391,7 @@ export default {
           ? 'npx lint-staged'
           : `${packageManager} lint-staged`;
 
-        const preCommitContent = `#!/usr/bin/env sh
-          ${lintStagedCmd}
-        `;
+        const preCommitContent = `${lintStagedCmd}`;
 
         await fs.writeFile(preCommitPath, preCommitContent, 'utf-8');
 
