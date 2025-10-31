@@ -355,37 +355,6 @@ export default {
           stdio: 'inherit'
         });
         installSpinner.succeed(chalk.green('Dependencies installed successfully!'));
-
-        // Initialize Husky
-        const huskySpinner = ora('Initializing Husky...').start();
-        try {
-          const huskyInitCmd = packageManager === 'pnpm'
-            ? ['exec', 'husky', 'init']
-            : packageManager === 'yarn'
-            ? ['dlx', 'husky', 'init']
-            : packageManager === 'bun'
-            ? ['x', 'husky', 'init']
-            : ['exec', '--', 'husky', 'init']; // npm default
-
-          await execa(packageManager === 'npm' ? 'npx' : packageManager, huskyInitCmd, {
-            cwd: targetDir,
-            stdio: 'pipe'
-          });
-          huskySpinner.succeed(chalk.green('Husky initialized successfully!'));
-        } catch (error) {
-          huskySpinner.warn(chalk.yellow('Husky initialization skipped or failed'));
-          console.log(chalk.gray('You can initialize Husky manually by running:'));
-          console.log(chalk.cyan(`  cd ${projectName}`));
-          if (packageManager === 'pnpm') {
-            console.log(chalk.cyan(`  pnpm exec husky init`));
-          } else if (packageManager === 'yarn') {
-            console.log(chalk.cyan(`  yarn dlx husky init`));
-          } else if (packageManager === 'bun') {
-            console.log(chalk.cyan(`  bunx husky init`));
-          } else {
-            console.log(chalk.cyan(`  npx husky init`));
-          }
-        }
       } catch (error) {
         installSpinner.fail(chalk.red('Failed to install dependencies'));
         console.log(chalk.yellow('\nYou can install them manually by running:'));
@@ -397,6 +366,39 @@ export default {
     // Initialize git repository if requested
     if (initGit) {
       await initializeGit(targetDir, projectName);
+    }
+
+    // Initialize Husky after git (Husky requires git to be initialized first)
+    if (!options.skipInstall && initGit) {
+      const huskySpinner = ora('Initializing Husky...').start();
+      try {
+        const huskyInitCmd = packageManager === 'pnpm'
+          ? ['exec', 'husky', 'init']
+          : packageManager === 'yarn'
+          ? ['dlx', 'husky', 'init']
+          : packageManager === 'bun'
+          ? ['x', 'husky', 'init']
+          : ['exec', '--', 'husky', 'init']; // npm default
+
+        await execa(packageManager === 'npm' ? 'npx' : packageManager, huskyInitCmd, {
+          cwd: targetDir,
+          stdio: 'pipe'
+        });
+        huskySpinner.succeed(chalk.green('Husky initialized successfully!'));
+      } catch (error) {
+        huskySpinner.warn(chalk.yellow('Husky initialization skipped or failed'));
+        console.log(chalk.gray('You can initialize Husky manually by running:'));
+        console.log(chalk.cyan(`  cd ${projectName}`));
+        if (packageManager === 'pnpm') {
+          console.log(chalk.cyan(`  pnpm exec husky init`));
+        } else if (packageManager === 'yarn') {
+          console.log(chalk.cyan(`  yarn dlx husky init`));
+        } else if (packageManager === 'bun') {
+          console.log(chalk.cyan(`  bunx husky init`));
+        } else {
+          console.log(chalk.cyan(`  npx husky init`));
+        }
+      }
     }
 
     // Success message
