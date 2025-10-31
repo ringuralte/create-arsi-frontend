@@ -363,7 +363,6 @@ async function createProject(projectName, options) {
       }
     ]);
     useVolta = voltaAnswer.useVolta;
-  }</parameter>
   }
 
   const spinner = ora('Creating your project...').start();
