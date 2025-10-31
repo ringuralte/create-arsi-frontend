@@ -392,10 +392,8 @@ export default {
           : `${packageManager} lint-staged`;
 
         const preCommitContent = `#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
-${lintStagedCmd}
-`;
+          ${lintStagedCmd}
+        `;
 
         await fs.writeFile(preCommitPath, preCommitContent, 'utf-8');
 
