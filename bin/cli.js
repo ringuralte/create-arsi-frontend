@@ -148,7 +148,7 @@ async function mergeDirectories(src, dest, exclude = ['node_modules', 'pnpm-lock
 }
 
 // Helper function to initialize git repository
-async function initializeGit(targetDir, projectName) {
+async function initializeGit(targetDir, projectName, commitHusky = false) {
   const gitSpinner = ora('Initializing git repository...').start();
 
   try {
@@ -157,7 +157,7 @@ async function initializeGit(targetDir, projectName) {
       await execa('git', ['--version'], { cwd: targetDir });
     } catch (error) {
       gitSpinner.warn(chalk.yellow('Git is not installed. Skipping git initialization.'));
-      return;
+      return false;
     }
 
     // Initialize git repository
@@ -173,6 +173,8 @@ async function initializeGit(targetDir, projectName) {
     await execa('git', ['commit', '-m', 'Initial commit: Project scaffolded'], { cwd: targetDir });
 
     gitSpinner.succeed(chalk.green('Git repository initialized with "dev" branch!'));
+
+    return true;
   } catch (error) {
     gitSpinner.fail(chalk.red('Failed to initialize git repository'));
     console.log(chalk.yellow('\nYou can initialize git manually by running:'));
@@ -181,10 +183,89 @@ async function initializeGit(targetDir, projectName) {
     console.log(chalk.cyan('  git checkout -b dev'));
     console.log(chalk.cyan('  git add .'));
     console.log(chalk.cyan('  git commit -m "Initial commit"'));
+    return false;
   }
 }
 
-// Main CLI function
+// Helper function to get current Volta Node version
+async function getVoltaNodeVersion() {
+  try {
+    // Check if Volta is installed
+    await execa('volta', ['--version']);
+
+    // Get the current Node version from Volta
+    const { stdout } = await execa('volta', ['list', 'node', '--current', '--format', 'plain']);
+
+    // Parse the output to get version number
+    // Output format is typically like: "v20.11.0"
+    const match = stdout.match(/v(\d+\.\d+\.\d+)/);
+    if (match) {
+      return match[1]; // Return version without 'v' prefix
+    }
+
+    // Fallback: try getting node version directly
+    const { stdout: nodeVersion } = await execa('node', ['--version']);
+    return nodeVersion.replace('v', '');
+  } catch (error) {
+    return null;
+  }
+}
+
+// Helper function to pin Node version with Volta
+async function pinNodeWithVolta(targetDir, packageManager) {
+  const voltaSpinner = ora('Pinning Node version with Volta...').start();
+
+  try {
+    // Check if Volta is installed
+    try {
+      await execa('volta', ['--version']);
+    } catch (error) {
+      voltaSpinner.warn(chalk.yellow('Volta is not installed. Skipping Node version pinning.'));
+      console.log(chalk.gray('Install Volta from: https://volta.sh'));
+      return false;
+    }
+
+    // Get current Node version
+    const nodeVersion = await getVoltaNodeVersion();
+
+    if (!nodeVersion) {
+      voltaSpinner.warn(chalk.yellow('Could not detect current Node version. Skipping pinning.'));
+      return false;
+    }
+
+    // Pin Node version
+    await execa('volta', ['pin', `node@${nodeVersion}`], {
+      cwd: targetDir,
+      stdio: 'pipe'
+    });
+
+    // Also pin the package manager if using pnpm or yarn
+    if (packageManager === 'pnpm' || packageManager === 'yarn') {
+      try {
+        const { stdout: pmVersion } = await execa(packageManager, ['--version']);
+        await execa('volta', ['pin', `${packageManager}@${pmVersion.trim()}`], {
+          cwd: targetDir,
+          stdio: 'pipe'
+        });
+        voltaSpinner.succeed(chalk.green(`Pinned Node v${nodeVersion} and ${packageManager} v${pmVersion.trim()} with Volta!`));
+      } catch (error) {
+        voltaSpinner.succeed(chalk.green(`Pinned Node v${nodeVersion} with Volta!`));
+      }
+    } else {
+      voltaSpinner.succeed(chalk.green(`Pinned Node v${nodeVersion} with Volta!`));
+    }
+
+    return true;
+  } catch (error) {
+    voltaSpinner.fail(chalk.red('Failed to pin Node version with Volta'));
+    console.log(chalk.yellow('\nYou can pin the Node version manually by running:'));
+    console.log(chalk.cyan(`  cd ${path.basename(targetDir)}`));
+    console.log(chalk.cyan('  volta pin node'));
+    return false;
+  }
+}
+
+// Main CLI function</parameter>
 async function createProject(projectName, options) {
   const targetDir = path.resolve(process.cwd(), projectName);
   const templatesDir = path.resolve(__dirname, '..', 'templates');
@@ -268,6 +349,23 @@ async function createProject(projectName, options) {
     initGit = gitAnswer.initGit;
   }
 
+  // Prompt for Volta Node version pinning
+  let useVolta = false;
+  const voltaNodeVersion = await getVoltaNodeVersion();
+
+  if (voltaNodeVersion) {
+    const voltaAnswer = await inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'useVolta',
+        message: `Pin Node version (v${voltaNodeVersion}) with Volta?`,
+        default: true
+      }
+    ]);
+    useVolta = voltaAnswer.useVolta;
+  }</parameter>
+  }
+
   const spinner = ora('Creating your project...').start();
 
   try {
@@ -345,6 +443,11 @@ export default {
 
     spinner.succeed(chalk.green('Project created successfully!'));
 
+    // Pin Node version with Volta if requested
+    if (useVolta) {
+      await pinNodeWithVolta(targetDir, packageManager);
+    }
+
     // Install dependencies
     if (!options.skipInstall) {
       const installSpinner = ora('Installing dependencies...').start();
@@ -364,12 +467,13 @@ export default {
     }
 
     // Initialize git repository if requested
+    let gitInitialized = false;
     if (initGit) {
-      await initializeGit(targetDir, projectName);
+      gitInitialized = await initializeGit(targetDir, projectName);
     }
 
     // Initialize Husky after git (Husky requires git to be initialized first)
-    if (!options.skipInstall && initGit) {
+    if (!options.skipInstall && gitInitialized) {
       const huskySpinner = ora('Initializing Husky...').start();
       try {
         const huskyInitCmd = packageManager === 'pnpm'
@@ -396,6 +500,16 @@ export default {
         await fs.writeFile(preCommitPath, preCommitContent, 'utf-8');
 
         huskySpinner.succeed(chalk.green('Husky initialized successfully!'));
+
+        // Commit Husky changes
+        const huskyCommitSpinner = ora('Committing Husky configuration...').start();
+        try {
+          await execa('git', ['add', '.husky'], { cwd: targetDir });
+          await execa('git', ['commit', '-m', 'chore: configure husky and lint-staged'], { cwd: targetDir });
+          huskyCommitSpinner.succeed(chalk.green('Husky configuration committed!'));
+        } catch (error) {
+          huskyCommitSpinner.warn(chalk.yellow('Failed to commit Husky changes'));
+        }
       } catch (error) {
         huskySpinner.warn(chalk.yellow('Husky initialization skipped or failed'));
         console.log(chalk.gray('You can initialize Husky manually by running:'));
