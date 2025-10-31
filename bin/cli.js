@@ -384,6 +384,21 @@ export default {
           cwd: targetDir,
           stdio: 'pipe'
         });
+
+        // Update pre-commit hook to use lint-staged instead of npm test
+        const preCommitPath = path.join(targetDir, '.husky', 'pre-commit');
+        const lintStagedCmd = packageManager === 'npm'
+          ? 'npx lint-staged'
+          : `${packageManager} lint-staged`;
+
+        const preCommitContent = `#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+${lintStagedCmd}
+`;
+
+        await fs.writeFile(preCommitPath, preCommitContent, 'utf-8');
+
         huskySpinner.succeed(chalk.green('Husky initialized successfully!'));
       } catch (error) {
         huskySpinner.warn(chalk.yellow('Husky initialization skipped or failed'));
