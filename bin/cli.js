@@ -355,6 +355,21 @@ export default {
           stdio: 'inherit'
         });
         installSpinner.succeed(chalk.green('Dependencies installed successfully!'));
+
+        // Initialize Husky
+        const huskySpinner = ora('Initializing Husky...').start();
+        try {
+          await execa(packageManager, ['run', 'prepare'], {
+            cwd: targetDir,
+            stdio: 'pipe'
+          });
+          huskySpinner.succeed(chalk.green('Husky initialized successfully!'));
+        } catch (error) {
+          huskySpinner.warn(chalk.yellow('Husky initialization skipped or failed'));
+          console.log(chalk.gray('You can initialize Husky manually by running:'));
+          console.log(chalk.cyan(`  cd ${projectName}`));
+          console.log(chalk.cyan(`  ${packageManager} run prepare`));
+        }
       } catch (error) {
         installSpinner.fail(chalk.red('Failed to install dependencies'));
         console.log(chalk.yellow('\nYou can install them manually by running:'));

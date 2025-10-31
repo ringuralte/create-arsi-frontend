@@ -4,6 +4,7 @@
   // Disable the default formatter, use eslint instead
   "prettier.enable": false,
   "editor.formatOnSave": false,
+  "typescript.preferences.autoImportFileExcludePatterns": ["@radix-ui/*"],
 
   // Auto fix
   "editor.codeActionsOnSave": {
