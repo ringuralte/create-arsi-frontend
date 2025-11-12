@@ -8,6 +8,7 @@ export default defineConfig({
     reactRouter(),
     babel({
       filter: /\.[jt]sx?$/,
+      exclude: [/node_modules/, /app\/gql\//],
       babelConfig: {
         presets: ['@babel/preset-typescript'],
         plugins: [

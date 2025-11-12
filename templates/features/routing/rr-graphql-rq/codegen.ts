@@ -1,7 +1,11 @@
 import type { CodegenConfig } from '@graphql-codegen/cli'
+import { config as dotenvConfig } from 'dotenv'
+
+dotenvConfig()
 
 const config: CodegenConfig = {
-  schema: import.meta.env.VITE_BASE_GRAPHQL_URL,
+  // eslint-disable-next-line node/prefer-global/process
+  schema: process.env.VITE_BASE_GRAPHQL_URL,
   documents: ['app/**/*.{ts,tsx}'],
   ignoreNoDocuments: true,
   generates: {
